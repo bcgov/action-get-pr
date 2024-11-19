@@ -53,7 +53,7 @@ runs:
           pr=$(\
             curl -sL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ inputs.token }}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/search/issues\?q\=repo:bcgov/onroutebc+is:pr+is:merged \
+              https://api.github.com/search/issues\?q\=repo:${{ github.repository }}+is:pr+is:merged \
               | jq '.items | sort_by(.pull_request.merged_at) | reverse'[0].number
           )
 
