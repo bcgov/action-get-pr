@@ -12,6 +12,8 @@ PR numbers are easy to come by in PRs, but passing those same numbers to release
 * Release events (finds the most recently merged PR)
 * PRs themselves (just for consistency)
 
+This process has been an integral part of PR-based workflows where images are promoted from development (PRs) to test/staging to production. It is also useful for release events where the most recent PR is tied to the release.
+
 # Usage
 
 The build will return a PR number as output.
@@ -25,7 +27,9 @@ The build will return a PR number as output.
 ```
 
 # Private Repositories
+
 Private repositories may need to provide a GitHub token.
+
 ```yaml
 - id: vars
   uses: bcgov/action-get-pr@vX.Y.Z
