@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 # Helper functions
 function log_debug() {
   if [ "${INPUT_DEBUG}" == "true" ]; then
@@ -62,7 +62,7 @@ then
   if [ -z "${pr}" ]
   then
     echo "No PR number found through API or git history"
-    pr=""
+    exit 1
   fi
 else
   echo "Event type: unknown or unexpected"
