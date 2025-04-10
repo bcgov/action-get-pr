@@ -29,10 +29,6 @@ runs:
   steps:
     - uses: actions/checkout@v4
 
-    - name: Make action.sh executable
-      shell: bash
-      run: chmod +x ${{ github.action_path }}/action.sh
-
     - id: vars
       shell: bash
       env:
