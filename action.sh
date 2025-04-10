@@ -27,31 +27,33 @@ function get_pr_from_git() {
 }
 
 # Process variables and inputs
-if [ ${GITHUB_EVENT_NAME} == 'pull_request' ]
+if [ -z "${GITHUB_EVENT_NAME}" ]; then
+  echo "Event type: local run (no GitHub event)"
+  pr=$(get_pr_from_git)
+elif [ "${GITHUB_EVENT_NAME}" == 'pull_request' ]
 then
   echo "Event type: pull request"
   pr=${GITHUB_EVENT_NUMBER}
-elif [ ${GITHUB_EVENT_NAME} == 'merge_group' ]
+elif [ "${GITHUB_EVENT_NAME}" == 'merge_group' ]
 then
   echo "Event type: merge queue"
+  if [ -n "${MERGE_GROUP_HEAD_REF}" ]; then
   pr=$(echo ${MERGE_GROUP_HEAD_REF} | grep -Eo "queue/main/pr-[0-9]+" | cut -d '-' -f2)
-elif [ ${GITHUB_EVENT_NAME} == 'push' ]
+  fi
+elif [ "${GITHUB_EVENT_NAME}" == 'push' ]
 then
   echo "Event type: push"
-  api_response=$(get_pr_from_api "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_EVENT_AFTER}/pulls")
-  pr=$(echo "$api_response" | jq .[0].number)
-
-  if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
-    log_debug "API method failed, trying git history"
-    pr=$(get_pr_from_git)
+  if [ -n "${GITHUB_EVENT_AFTER}" ] && [ -n "${GITHUB_REPOSITORY}" ]; then
+    api_response=$(get_pr_from_api "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_EVENT_AFTER}/pulls")
+    pr=$(echo "$api_response" | jq .[0].number)
   fi
-elif [ ${GITHUB_EVENT_NAME} == 'release' ]
+elif [ "${GITHUB_EVENT_NAME}" == 'release' ]
 then
   echo "Event type: release"
-  # Try API first
-  api_response=$(get_pr_from_api "https://api.github.com/search/issues?q=repo:${GITHUB_REPOSITORY}+is:pr+is:merged+sort:updated-desc")
-  pr=$(echo "$api_response" | jq .items[0].number)
-
+  # Try API first if we have the repository info
+  if [ -n "${GITHUB_REPOSITORY}" ]; then
+    api_response=$(get_pr_from_api "https://api.github.com/search/issues?q=repo:${GITHUB_REPOSITORY}+is:pr+is:merged+sort:updated-desc")
+  fi
   # Fallback to git history if API fails
   if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
     log_debug "API method failed, trying git history"
