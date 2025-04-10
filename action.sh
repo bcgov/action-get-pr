@@ -85,4 +85,8 @@ fi
 # Output PR number
 echo "Summary ---"
 echo -e "\tPR: ${pr}"
-echo "pr=${pr}" >> $GITHUB_OUTPUT
+
+# Only write to GITHUB_OUTPUT when running as a GitHub Action
+if [ -n "${INPUT_TOKEN}" ]; then
+  echo "pr=${pr}" >> $GITHUB_OUTPUT
+fi
