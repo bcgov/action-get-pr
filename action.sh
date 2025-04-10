@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+
 # Helper functions
 function log_debug() {
   if [ "${INPUT_DEBUG}" == "true" ]; then
