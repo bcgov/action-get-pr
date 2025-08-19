@@ -14,20 +14,20 @@ inputs:
   ### Usually a bad idea / not recommended
   debug:
     description: Enable debug logging
-    default: 'false'
+    default: "false"
   token:
     description: Specify token (GH or PAT), instead of inheriting one from the calling workflow
     default: ${{ github.token }}
 
 outputs:
   pr:
-    description: 'Associated pull request number'
+    description: "Associated pull request number"
     value: ${{ steps.vars.outputs.pr }}
 
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+    - uses: actions/checkout@v4
 
     - id: vars
       shell: bash
