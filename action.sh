@@ -51,43 +51,18 @@ case "${GITHUB_EVENT_NAME}" in
     ;;
   "release")
     echo "Event type: release"
-    # First, try to find PR from the release's commit SHA
+    # Find PR from the release's commit SHA (same approach as push events)
     if [ -n "${GITHUB_SHA}" ] && [ -n "${GITHUB_REPOSITORY}" ]; then
-      log_debug "Trying to find PR from release commit SHA: ${GITHUB_SHA}"
       api_response=$(get_pr_from_api "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls")
       pr=$(get_pr_from_api_response "$api_response")
     fi
-    
-    # If that failed, try git history from that commit
     if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
-      if [ -n "${GITHUB_SHA}" ]; then
-        log_debug "API method failed, trying git history from release commit"
-        # Look for PR in commit message of the release commit
-        pr=$(git log --pretty=format:%s -1 ${GITHUB_SHA} 2>/dev/null | grep -o '#[0-9]\+' | grep -o '[0-9]\+' | head -1)
-      fi
+      log_debug "API method failed, trying git history"
+      pr=$(get_pr_from_git)
     fi
-    
-    # If we have a commit SHA but still can't find PR, fail rather than guess
-    if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
-      if [ -n "${GITHUB_SHA}" ]; then
-        echo "No PR number found for release commit ${GITHUB_SHA} through API or git history"
-        exit 1
-      fi
-      # Only if no commit SHA is available (edge case), fall back to most recently merged PR
-      log_debug "No commit SHA available, falling back to most recently merged PR"
-      if [ -n "${GITHUB_REPOSITORY}" ]; then
-        api_response=$(get_pr_from_api "https://api.github.com/search/issues?q=repo:${GITHUB_REPOSITORY}+is:pr+is:merged")
-        # Sort by merged_at timestamp (most recent first) to ensure we get the latest merge
-        pr=$(echo "$api_response" | jq -r '.items | sort_by(.pull_request.merged_at) | reverse | .[0].number // empty' 2>/dev/null)
-      fi
-      if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
-        log_debug "API method failed, trying git history from HEAD"
-        pr=$(get_pr_from_git)
-      fi
-      if [ -z "${pr}" ]; then
-        echo "No PR number found and no commit SHA available for release"
-        exit 1
-      fi
+    if [ -z "${pr}" ]; then
+      echo "No PR number found through API or git history"
+      exit 1
     fi
     ;;
   "workflow_dispatch")
