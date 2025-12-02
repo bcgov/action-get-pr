@@ -39,7 +39,7 @@ case "${GITHUB_EVENT_NAME}" in
     if [ -n "${MERGE_GROUP_HEAD_REF}" ]; then
       # MERGE_GROUP_HEAD_REF format: queue/<branch>/pr-<number>
       # Anchor to start, match any branch name, capture PR number only
-      pr=$(echo "${MERGE_GROUP_HEAD_REF}" | sed -n 's|^queue/[^/]*/pr-\([0-9]*\).*|\1|p')
+      pr=$(echo "${MERGE_GROUP_HEAD_REF}" | sed -n 's|^queue/[^/]*/pr-\([0-9]\+\).*|\1|p')
     fi
     ;;
   "push")
