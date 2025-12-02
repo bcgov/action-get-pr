@@ -66,6 +66,30 @@ then
     echo "No PR number found through API or git history"
     exit 1
   fi
+elif [ "${GITHUB_EVENT_NAME}" == 'workflow_dispatch' ]
+then
+  echo "Event type: workflow_dispatch"
+  # First try to get PR from current commit message
+  pr=$(get_pr_from_git)
+  
+  # If that fails, try API to get PRs associated with current commit
+  if [ -z "${pr}" ] && [ -n "${GITHUB_REPOSITORY}" ] && [ -n "${GITHUB_SHA}" ]; then
+    log_debug "Commit message method failed, trying API"
+    api_response=$(get_pr_from_api "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls")
+    pr=$(echo "$api_response" | jq -r '.[0].number // empty')
+  fi
+  
+  # If still no PR, search recent commit history (last 10 commits)
+  if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
+    log_debug "API method failed, searching recent commit history"
+    pr=$(git log --pretty=format:%s -10 | grep -o '#[0-9]\+' | grep -o '[0-9]\+' | head -1)
+  fi
+  
+  # Final validation
+  if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
+    echo "No PR number found in commit message, API, or recent git history"
+    exit 1
+  fi
 else
   echo "Event type: unknown or unexpected"
   exit 1
