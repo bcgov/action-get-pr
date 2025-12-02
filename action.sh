@@ -37,7 +37,7 @@ case "${GITHUB_EVENT_NAME}" in
   "merge_group")
     echo "Event type: merge queue"
     [ -n "${MERGE_GROUP_HEAD_REF}" ] && \
-      pr=$(echo ${MERGE_GROUP_HEAD_REF} | grep -Eo "queue/main/pr-[0-9]+" | cut -d '-' -f2)
+      pr=$(echo "${MERGE_GROUP_HEAD_REF}" | grep -Eo "queue/main/pr-[0-9]+" | cut -d '-' -f2)
     ;;
   "push")
     echo "Event type: push"
