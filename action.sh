@@ -52,8 +52,9 @@ case "${GITHUB_EVENT_NAME}" in
   "release")
     echo "Event type: release"
     if [ -n "${GITHUB_REPOSITORY}" ]; then
-      api_response=$(get_pr_from_api "https://api.github.com/search/issues?q=repo:${GITHUB_REPOSITORY}+is:pr+is:merged+sort:updated-desc")
-      pr=$(get_pr_from_api_response "$api_response")
+      api_response=$(get_pr_from_api "https://api.github.com/search/issues?q=repo:${GITHUB_REPOSITORY}+is:pr+is:merged")
+      # Sort by merged_at timestamp (most recent first) to ensure we get the latest merge
+      pr=$(echo "$api_response" | jq -r '.items | sort_by(.pull_request.merged_at) | reverse | .[0].number // empty' 2>/dev/null)
     fi
     if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
       log_debug "API method failed, trying git history"
