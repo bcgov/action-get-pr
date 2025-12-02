@@ -34,9 +34,6 @@ runs:
       env:
         INPUT_DEBUG: ${{ inputs.debug }}
         INPUT_TOKEN: ${{ inputs.token }}
-        GITHUB_EVENT_NAME: ${{ github.event_name }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-        GITHUB_SHA: ${{ github.sha }}
         MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
         GITHUB_EVENT_AFTER: ${{ github.event.after }}
         GITHUB_EVENT_NUMBER: ${{ github.event.number }}
