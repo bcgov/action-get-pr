@@ -51,8 +51,9 @@ case "${GITHUB_EVENT_NAME}" in
     ;;
   "release")
     echo "Event type: release"
-    if [ -n "${GITHUB_REPOSITORY}" ]; then
-      api_response=$(get_pr_from_api "https://api.github.com/search/issues?q=repo:${GITHUB_REPOSITORY}+is:pr+is:merged+sort:updated-desc")
+    # Find PR from the release's commit SHA (same approach as push events)
+    if [ -n "${GITHUB_SHA}" ] && [ -n "${GITHUB_REPOSITORY}" ]; then
+      api_response=$(get_pr_from_api "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls")
       pr=$(get_pr_from_api_response "$api_response")
     fi
     if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
