@@ -39,41 +39,18 @@ case "${GITHUB_EVENT_NAME}" in
     [ -n "${MERGE_GROUP_HEAD_REF}" ] && \
       pr=$(echo ${MERGE_GROUP_HEAD_REF} | grep -Eo "queue/main/pr-[0-9]+" | cut -d '-' -f2)
     ;;
-  "push")
-    echo "Event type: push"
-    if [ -n "${GITHUB_EVENT_AFTER}" ] && [ -n "${GITHUB_REPOSITORY}" ]; then
-      api_response=$(get_pr_from_api "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_EVENT_AFTER}/pulls")
-      pr=$(get_pr_from_api_response "$api_response")
-    fi
-    ;;
-  "release")
-    echo "Event type: release"
-    if [ -n "${GITHUB_REPOSITORY}" ]; then
-      api_response=$(get_pr_from_api "https://api.github.com/search/issues?q=repo:${GITHUB_REPOSITORY}+is:pr+is:merged+sort:updated-desc")
-    fi
-    if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
-      log_debug "API method failed, trying git history"
-      pr=$(get_pr_from_git)
-    fi
-    if [ -z "${pr}" ]; then
-      echo "No PR number found through API or git history"
-      exit 1
-    fi
-    ;;
-  "workflow_dispatch")
-    echo "Event type: workflow_dispatch"
-    pr=$(get_pr_from_git)
-    if [ -z "${pr}" ] && [ -n "${GITHUB_REPOSITORY}" ] && [ -n "${GITHUB_SHA}" ]; then
-      log_debug "Commit message method failed, trying API"
-      api_response=$(get_pr_from_api "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls")
+  "push"|"release"|"workflow_dispatch")
+    echo "Event type: ${GITHUB_EVENT_NAME}"
+    # Use GITHUB_SHA for workflow_dispatch/release, GITHUB_EVENT_AFTER for push
+    local commit_sha="${GITHUB_SHA}"
+    [ "${GITHUB_EVENT_NAME}" = "push" ] && commit_sha="${GITHUB_EVENT_AFTER}"
+    
+    if [ -n "${GITHUB_REPOSITORY}" ] && [ -n "${commit_sha}" ]; then
+      api_response=$(get_pr_from_api "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${commit_sha}/pulls")
       pr=$(get_pr_from_api_response "$api_response")
     fi
     if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
-      log_debug "API method failed, searching recent commit history"
-      pr=$(get_pr_from_git 10)
-    fi
-    if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
-      echo "No PR number found in commit message, API, or recent git history"
+      echo "No PR number found for commit ${commit_sha}. All commits on default branch should come from PRs."
       exit 1
     fi
     ;;
