@@ -36,8 +36,11 @@ case "${GITHUB_EVENT_NAME}" in
     ;;
   "merge_group")
     echo "Event type: merge queue"
-    [ -n "${MERGE_GROUP_HEAD_REF}" ] && \
-      pr=$(echo "${MERGE_GROUP_HEAD_REF}" | grep -Eo "queue/main/pr-[0-9]+" | cut -d '-' -f2)
+    if [ -n "${MERGE_GROUP_HEAD_REF}" ]; then
+      # MERGE_GROUP_HEAD_REF format: queue/<branch>/pr-<number>
+      # Anchor to start, match any branch name, capture PR number only
+      pr=$(echo "${MERGE_GROUP_HEAD_REF}" | sed -n 's|^queue/[^/]*/pr-\([0-9]*\).*|\1|p')
+    fi
     ;;
   "push")
     echo "Event type: push"
