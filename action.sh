@@ -20,7 +20,13 @@ function get_pr_from_api_response() {
 
 function get_pr_from_git() {
   local commits=${1:-1}
-  git log --pretty=format:%s -${commits} 2>/dev/null | grep -oE '\(#([0-9]+)\)' | tail -1 | grep -oE '[0-9]+'
+  git log --pretty=format:%s -${commits} 2>/dev/null | while read line; do
+    trimmed=$(echo "$line" | sed 's/[[:space:]]*$//')
+    if [[ $trimmed =~ \(#([0-9]+)\)$ ]]; then
+      echo "${BASH_REMATCH[1]}"
+      break
+    fi
+  done
 }
 
 # Process variables and inputs
