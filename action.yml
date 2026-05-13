@@ -28,6 +28,8 @@ runs:
   using: composite
   steps:
     - uses: actions/checkout@v6
+      with:
+        token: ${{ inputs.token }}
 
     - id: vars
       shell: bash
