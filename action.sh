@@ -25,6 +25,9 @@ function get_pr_from_git() {
     if [[ $trimmed =~ \(#([0-9]+)\)$ ]]; then
       echo "${BASH_REMATCH[1]}"
       break
+    elif [[ $trimmed =~ Merge\ pull\ request\ #([0-9]+) ]]; then
+      echo "${BASH_REMATCH[1]}"
+      break
     fi
   done
 }
@@ -53,6 +56,10 @@ case "${GITHUB_EVENT_NAME}" in
     if [ -n "${GITHUB_EVENT_AFTER}" ] && [ -n "${GITHUB_REPOSITORY}" ]; then
       api_response=$(get_pr_from_api "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_EVENT_AFTER}/pulls")
       pr=$(get_pr_from_api_response "$api_response")
+    fi
+    if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
+      log_debug "API method failed, trying git history"
+      pr=$(get_pr_from_git)
     fi
     ;;
   "release")
