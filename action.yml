@@ -15,7 +15,7 @@ inputs:
   debug:
     description: Enable debug logging
     default: "false"
-  token:
+  github_token:
     description: Specify token (GH or PAT), instead of inheriting one from the calling workflow
     default: ${{ github.token }}
 
@@ -29,13 +29,13 @@ runs:
   steps:
     - uses: actions/checkout@v6
       with:
-        token: ${{ inputs.token }}
+        token: ${{ inputs.github_token }}
 
     - id: vars
       shell: bash
       env:
         INPUT_DEBUG: ${{ inputs.debug }}
-        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_TOKEN: ${{ inputs.github_token }}
         MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
         GITHUB_EVENT_AFTER: ${{ github.event.after }}
         GITHUB_EVENT_NUMBER: ${{ github.event.number }}
