@@ -3,9 +3,9 @@ const fs = require('fs');
 async function main() {
   const debug = process.env.INPUT_DEBUG === 'true';
   const token = process.env.INPUT_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
-  const eventName = process.env.GITHUB_EVENT_NAME;
-  const repository = process.env.GITHUB_REPOSITORY;
-  const sha = process.env.GITHUB_SHA;
+  const eventName = process.env.TEST_EVENT_NAME || process.env.GITHUB_EVENT_NAME;
+  const repository = process.env.TEST_REPOSITORY || process.env.GITHUB_REPOSITORY;
+  const sha = process.env.TEST_SHA || process.env.GITHUB_SHA;
 
   function logDebug(msg) {
     if (debug) console.log(`DEBUG: ${msg}`);
@@ -15,7 +15,7 @@ async function main() {
 
   // Load and parse event payload JSON natively if present
   let payload = {};
-  const eventPath = process.env.GITHUB_EVENT_PATH;
+  const eventPath = process.env.TEST_EVENT_PATH || process.env.GITHUB_EVENT_PATH;
   if (eventPath && fs.existsSync(eventPath)) {
     try {
       payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
@@ -39,7 +39,7 @@ async function main() {
     }
   } else if (eventName === 'merge_group') {
     console.log('Event type: merge queue');
-    // Sourced natively from GITHUB_EVENT_PATH event payload
+    // Sourced natively from event payload
     let mergeGroupHeadRef = '';
     if (payload.merge_group && payload.merge_group.head_ref) {
       mergeGroupHeadRef = payload.merge_group.head_ref;
@@ -58,7 +58,7 @@ async function main() {
     // Resolve commit SHA
     let commitSha = sha || '';
     if (eventName === 'push') {
-      commitSha = payload.after || process.env.GITHUB_EVENT_AFTER || sha || '';
+      commitSha = process.env.TEST_EVENT_AFTER || payload.after || process.env.GITHUB_EVENT_AFTER || sha || '';
     }
 
     if (commitSha && repository) {
@@ -134,7 +134,7 @@ async function main() {
   console.log('Summary ---');
   console.log(`\tPR: ${pr}`);
 
-  // Output to GITHUB_OUTPUT (Required token gate removed)
+  // Output to GITHUB_OUTPUT
   const outputPath = process.env.GITHUB_OUTPUT;
   if (outputPath) {
     fs.appendFileSync(outputPath, `pr=${pr}\n`);

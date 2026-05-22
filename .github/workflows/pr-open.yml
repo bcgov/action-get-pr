@@ -54,8 +54,8 @@ jobs:
           echo "PR: ${{ env.pr }}"
 
   # Comprehensive mock integration test suite.
-  # We mock standard GitHub Actions environment variables to test all code paths.
-  # For network queries, we perform live integration tests querying THIS repo's own Git history!
+  # Note: Standard GITHUB_* environment variables are read-only inside GHA steps.
+  # We use TEST_* counterparts to override and test specific event flows in CI.
   test-scenarios:
     name: Test Scenarios
     runs-on: ubuntu-24.04
@@ -72,7 +72,7 @@ jobs:
       - name: Test PR event
         run: |
           echo '{"pull_request": {"number": 40}}' > /tmp/event-pr.json
-          GITHUB_EVENT_NAME=pull_request GITHUB_EVENT_PATH=/tmp/event-pr.json node index.js > output.txt
+          TEST_EVENT_NAME=pull_request TEST_EVENT_PATH=/tmp/event-pr.json node index.js > output.txt
           cat output.txt
           grep -q "PR: 40" output.txt || (echo "FAILED: PR event" && exit 1)
 
@@ -81,7 +81,7 @@ jobs:
       - name: Test Merge Queue event
         run: |
           echo '{"merge_group": {"head_ref": "queue/main/pr-40-abcdef"}}' > /tmp/event-mq.json
-          GITHUB_EVENT_NAME=merge_group GITHUB_EVENT_PATH=/tmp/event-mq.json node index.js > output.txt
+          TEST_EVENT_NAME=merge_group TEST_EVENT_PATH=/tmp/event-mq.json node index.js > output.txt
           cat output.txt
           grep -q "PR: 40" output.txt || (echo "FAILED: Merge Queue event" && exit 1)
 
@@ -90,10 +90,10 @@ jobs:
       # The official squash commit SHA for PR #39 is 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412.
       - name: Test Push event (PR Merge)
         env:
-          GITHUB_EVENT_NAME: push
-          GITHUB_EVENT_AFTER: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
+          TEST_EVENT_NAME: push
+          TEST_EVENT_AFTER: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
           INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          TEST_REPOSITORY: ${{ github.repository }}
         run: |
           output=$(node index.js)
           echo "$output"
@@ -103,10 +103,10 @@ jobs:
       # We target the same merged commit SHA (8f9a16a...) for PR #39.
       - name: Test Release event (PR Merge)
         env:
-          GITHUB_EVENT_NAME: release
-          GITHUB_SHA: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
+          TEST_EVENT_NAME: release
+          TEST_SHA: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
           INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          TEST_REPOSITORY: ${{ github.repository }}
         run: |
           output=$(node index.js)
           echo "$output"
@@ -116,10 +116,10 @@ jobs:
       # We target the same merged commit SHA (8f9a16a...) for PR #39.
       - name: Test Workflow Dispatch event (PR Merge)
         env:
-          GITHUB_EVENT_NAME: workflow_dispatch
-          GITHUB_SHA: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
+          TEST_EVENT_NAME: workflow_dispatch
+          TEST_SHA: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
           INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          TEST_REPOSITORY: ${{ github.repository }}
         run: |
           output=$(node index.js)
           echo "$output"
@@ -130,10 +130,10 @@ jobs:
       # The action must exit non-zero (fail), proving direct pushes are blocked from deployments!
       - name: Test Direct Push (Cowboy Fail-Fast)
         env:
-          GITHUB_EVENT_NAME: push
-          GITHUB_EVENT_AFTER: 0000000000000000000000000000000000000000
+          TEST_EVENT_NAME: push
+          TEST_EVENT_AFTER: 0000000000000000000000000000000000000000
           INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          TEST_REPOSITORY: ${{ github.repository }}
         run: |
           # This should fail (exit non-zero)
           if node index.js; then
