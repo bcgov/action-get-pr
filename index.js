@@ -30,13 +30,6 @@ async function main() {
 
   if (eventName === 'pull_request') {
     console.log('Event type: pull request');
-    // Filter out Renovate Dependency Dashboard pull requests
-    const prTitle = (payload.pull_request && payload.pull_request.title) || payload.title;
-    if (prTitle && prTitle.includes('Dependency Dashboard')) {
-      console.log('Renovate Dependency Dashboard PR detected. Skipping gracefully.');
-      process.exit(0);
-    }
-
     // Extract pull request number from payload
     if (payload.pull_request && payload.pull_request.number) {
       pr = String(payload.pull_request.number);
@@ -112,11 +105,6 @@ async function main() {
           if (res.status === 200) {
             const body = await res.json();
             if (body && body[0] && body[0].number) {
-              const prTitle = body[0].title;
-              if (prTitle && prTitle.includes('Dependency Dashboard')) {
-                console.log('Renovate Dependency Dashboard PR detected via API. Skipping gracefully.');
-                process.exit(0);
-              }
               pr = String(body[0].number);
               break;
             } else {
