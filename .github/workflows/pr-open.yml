@@ -27,7 +27,7 @@ jobs:
           echo "github.event.action: ${{ github.event.action }}"
           echo "${GITHUB_CONTEXT}" | jq .
 
-  # Test for PR, merge queue and merge to main
+  # Test for PR, merge queue and merge to main using the local Node.js action
   get-pr:
     name: Get PR number
     runs-on: ubuntu-24.04
@@ -38,6 +38,7 @@ jobs:
       - id: vars
         uses: ./
 
+  # Verify standard end-to-end pull request scenario output
   verify-pr:
     name: Verify PR number
     needs: [get-pr]
@@ -48,6 +49,164 @@ jobs:
       - name: Verify PR number
         run: |
           # Check needs.get-pr.outputs.pr
-          [ ! -z ${{ env.pr }} ]|| \
+          [ ! -z "${{ env.pr }}" ] || \
             (echo "No PR number" && exit 1)
           echo "PR: ${{ env.pr }}"
+
+  # Comprehensive mock integration test suite.
+  # Note: Standard GITHUB_* environment variables are read-only inside GHA steps.
+  # We use TEST_* counterparts to override and test specific event flows in CI.
+  test-scenarios:
+    name: Test Scenarios
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Scenario 1: Mock a standard pull request event
+      # We generate a minimal JSON event payload on disk to test native payload parsing.
+      - name: Test PR event
+        run: |
+          echo '{"pull_request": {"number": 40}}' > /tmp/event-pr.json
+          TEST_EVENT_NAME=pull_request TEST_EVENT_PATH=/tmp/event-pr.json node index.js > output.txt
+          cat output.txt
+          grep -q "PR: 40" output.txt || (echo "FAILED: PR event" && exit 1)
+
+      # Scenario 2: Mock a Merge Queue event
+      # We generate a minimal JSON event payload on disk to test native payload parsing.
+      - name: Test Merge Queue event
+        run: |
+          echo '{"merge_group": {"head_ref": "queue/main/pr-40-abcdef"}}' > /tmp/event-mq.json
+          TEST_EVENT_NAME=merge_group TEST_EVENT_PATH=/tmp/event-mq.json node index.js > output.txt
+          cat output.txt
+          grep -q "PR: 40" output.txt || (echo "FAILED: Merge Queue event" && exit 1)
+
+      # Scenario 3: Live API integration test for a Push event (PR Merge)
+      # We target the actual squash-merged commit SHA of PR #39: 8f9a16a1f7a7574b10e2fb473bfef0c4c4fff3d6.
+      - name: Test Push event (PR Merge)
+        env:
+          TEST_EVENT_NAME: push
+          TEST_EVENT_AFTER: 8f9a16a1f7a7574b10e2fb473bfef0c4c4fff3d6
+          INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TEST_REPOSITORY: ${{ github.repository }}
+        run: |
+          output=$(node index.js)
+          echo "$output"
+          echo "$output" | grep -q "PR: 39" || (echo "FAILED: Push event" && exit 1)
+
+      # Scenario 4: Live API integration test for a Release event
+      # We target the same historical commit SHA of PR #39 (associated with tag v0.2.1).
+      - name: Test Release event (PR Merge)
+        env:
+          TEST_EVENT_NAME: release
+          TEST_SHA: 8f9a16a1f7a7574b10e2fb473bfef0c4c4fff3d6
+          INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TEST_REPOSITORY: ${{ github.repository }}
+        run: |
+          output=$(node index.js)
+          echo "$output"
+          echo "$output" | grep -q "PR: 39" || (echo "FAILED: Release event" && exit 1)
+
+      # Scenario 5: Live API integration test for manual Workflow Dispatch event
+      # We target the same historical commit SHA of PR #39.
+      - name: Test Workflow Dispatch event (PR Merge)
+        env:
+          TEST_EVENT_NAME: workflow_dispatch
+          TEST_SHA: 8f9a16a1f7a7574b10e2fb473bfef0c4c4fff3d6
+          INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TEST_REPOSITORY: ${{ github.repository }}
+        run: |
+          output=$(node index.js)
+          echo "$output"
+          echo "$output" | grep -q "PR: 39" || (echo "FAILED: Workflow Dispatch event" && exit 1)
+
+      # Scenario 6: Direct Push / Cowboy Protection fail-fast test
+      # We mock a direct push to main with a fake commit SHA (0000000...) that has no PR.
+      # The action must exit non-zero (fail), proving direct pushes are blocked from deployments!
+      - name: Test Direct Push (Cowboy Fail-Fast)
+        env:
+          TEST_EVENT_NAME: push
+          TEST_EVENT_AFTER: 0000000000000000000000000000000000000000
+          INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TEST_REPOSITORY: ${{ github.repository }}
+        run: |
+          # This should fail (exit non-zero)
+          if node index.js; then
+            echo "FAILED: Direct push should have failed"
+            exit 1
+          else
+            echo "PASSED: Direct push failed as expected!"
+          fi
+
+      # Scenario 7: Issues ignore list filtering tests (rules.yml)
+      # When a configured issue title is opened/edited, the action must exit gracefully with code 0 (success).
+      - name: Test issue ignore list filtering
+        run: |
+          # Test Renovate Dependency Dashboard
+          echo '{"issue": {"title": "Dependency Dashboard"}}' > /tmp/event-renovate.json
+          TEST_EVENT_NAME=issues TEST_EVENT_PATH=/tmp/event-renovate.json node index.js > output.txt
+          cat output.txt
+          grep -q 'Ignore rule matched for "Dependency Dashboard"' output.txt || (echo "FAILED: Dependency Dashboard filter" && exit 1)
+
+          # Test ZAP Security Report
+          echo '{"issue": {"title": "ZAP Security Report"}}' > /tmp/event-zap.json
+          TEST_EVENT_NAME=issues TEST_EVENT_PATH=/tmp/event-zap.json node index.js > output.txt
+          cat output.txt
+          grep -q 'Ignore rule matched for "ZAP Security Report"' output.txt || (echo "FAILED: ZAP Security Report filter" && exit 1)
+
+  # Fully automated end-to-end integration test of a real workflow_dispatch.
+  # When a PR check runs, this job triggers a real workflow_dispatch run of test-dispatch.yml,
+  # watches the run to completion, and verifies its exit status.
+  # Gated on same-repo pull_requests to prevent failures on external fork PRs.
+  # Note: The very first run on this PR will fail on GHA because test-dispatch.yml isn't on main yet.
+  # Once merged to main, this will execute successfully on every future same-repo PR.
+  test-real-dispatch:
+    name: Test Real Dispatch
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Trigger, watch, and verify real workflow_dispatch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ref="${{ github.event.pull_request.head.ref || github.head_ref }}"
+          echo "Triggering workflow_dispatch on branch: $ref"
+          # Programmatically dispatch the test-dispatch.yml workflow using the GitHub CLI
+          gh workflow run test-dispatch.yml --ref "$ref"
+          
+          # Sleep to let the runner API register the dispatch event
+          sleep 5
+          
+          echo "Polling GitHub API for the newly triggered run ID..."
+          run_id=""
+          for i in {1..10}; do
+            run_id=$(gh run list --workflow=test-dispatch.yml --branch="$ref" --event=workflow_dispatch --limit=1 --json databaseId --jq '.[0].databaseId')
+            if [ ! -z "$run_id" ]; then
+              echo "Found triggered run ID: $run_id"
+              break
+            fi
+            echo "Waiting for run to register..."
+            sleep 3
+          done
+          
+          if [ -z "$run_id" ]; then
+            echo "FAILED: Could not find triggered workflow run in API"
+            exit 1
+          fi
+          
+          echo "Watching workflow run $run_id..."
+          gh run watch "$run_id"
+          
+          echo "Verifying run execution completed successfully..."
+          gh run view "$run_id" --exit-status
