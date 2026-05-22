@@ -7,10 +7,53 @@ function log_debug() {
 
 function get_pr_from_api() {
   local url=$1
-  curl -sL -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${INPUT_TOKEN}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "$url" 2>/dev/null
+  local response=""
+  local attempt=1
+  local max_attempts=3
+  local sleep_seconds=2
+
+  while [ $attempt -le $max_attempts ]; do
+    log_debug "Fetching PR from API (attempt ${attempt}/${max_attempts})...."
+    
+    response=$(curl -sL -w "\n%{http_code}" -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer ${INPUT_TOKEN}" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "$url" 2>/dev/null)
+    
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+      echo "WARNING: curl failed with exit code ${exit_code}" >&2
+    fi
+
+    # Split response into body and http_code
+    local http_code
+    http_code=$(echo "$response" | tail -n 1)
+    local body
+    body=$(echo "$response" | sed '$d')
+
+    log_debug "API HTTP status: ${http_code}"
+    
+    if [ "${http_code}" -eq 200 ]; then
+      local pr_number
+      pr_number=$(echo "$body" | jq -r '.[0].number // empty' 2>/dev/null)
+      if [ -n "${pr_number}" ] && [ "${pr_number}" != "null" ]; then
+        echo "$body"
+        return 0
+      else
+        log_debug "API returned 200 but no associated pull request was found (indexing lag)."
+      fi
+    else
+      echo "WARNING: API request failed with HTTP ${http_code}. Response: ${body}" >&2
+    fi
+
+    if [ $attempt -lt $max_attempts ]; then
+      log_debug "Sleeping ${sleep_seconds}s before next attempt..."
+      sleep $sleep_seconds
+    fi
+    attempt=$((attempt + 1))
+  done
+
+  return 1
 }
 
 function get_pr_from_api_response() {
@@ -20,12 +63,31 @@ function get_pr_from_api_response() {
 
 function get_pr_from_git() {
   local commits=${1:-1}
-  git log --pretty=format:%s -${commits} 2>/dev/null | while read line; do
+  local squash_pattern='\(#([0-9]+)\)$'
+  local merge_pattern='Merge pull request #([0-9]+)'
+
+  # Check if we are inside a valid git repository
+  local git_err
+  git_err=$(git rev-parse --is-inside-work-tree 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "WARNING: git command failed. Not in a valid git repository or directory ownership issue: ${git_err}" >&2
+    return 1
+  fi
+
+  local log_output
+  log_output=$(git log --pretty=format:%s -${commits} 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "WARNING: git log failed: ${log_output}" >&2
+    return 1
+  fi
+
+  echo "$log_output" | while read -r line; do
+    local trimmed
     trimmed=$(echo "$line" | sed 's/[[:space:]]*$//')
-    if [[ $trimmed =~ \(#([0-9]+)\)$ ]]; then
+    if [[ $trimmed =~ $squash_pattern ]]; then
       echo "${BASH_REMATCH[1]}"
       break
-    elif [[ $trimmed =~ Merge\ pull\ request\ #([0-9]+) ]]; then
+    elif [[ $trimmed =~ $merge_pattern ]]; then
       echo "${BASH_REMATCH[1]}"
       break
     fi
