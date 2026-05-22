@@ -7,7 +7,20 @@ async function main() {
   const repository = process.env.GITHUB_REPOSITORY;
   const eventAfter = process.env.GITHUB_EVENT_AFTER;
   const sha = process.env.GITHUB_SHA;
-  const eventNumber = process.env.GITHUB_EVENT_NUMBER;
+  let eventNumber = process.env.GITHUB_EVENT_NUMBER || '';
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!eventNumber && eventPath && fs.existsSync(eventPath)) {
+    try {
+      const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+      if (payload.pull_request && payload.pull_request.number) {
+        eventNumber = String(payload.pull_request.number);
+      } else if (payload.number) {
+        eventNumber = String(payload.number);
+      }
+    } catch (e) {
+      if (debug) console.log(`DEBUG: Failed to parse event payload JSON: ${e.message}`);
+    }
+  }
   const mergeGroupHeadRef = process.env.MERGE_GROUP_HEAD_REF;
 
   function logDebug(msg) {
