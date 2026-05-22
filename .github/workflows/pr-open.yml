@@ -64,7 +64,7 @@ jobs:
           GITHUB_EVENT_NAME: pull_request
           GITHUB_EVENT_NUMBER: "40"
         run: |
-          output=$(./action.sh)
+          output=$(node index.js)
           echo "$output"
           echo "$output" | grep -q "PR: 40" || (echo "FAILED: PR event" && exit 1)
 
@@ -73,7 +73,7 @@ jobs:
           GITHUB_EVENT_NAME: merge_group
           MERGE_GROUP_HEAD_REF: queue/main/pr-40-abcdef
         run: |
-          output=$(./action.sh)
+          output=$(node index.js)
           echo "$output"
           echo "$output" | grep -q "PR: 40" || (echo "FAILED: Merge Queue event" && exit 1)
 
@@ -84,7 +84,7 @@ jobs:
           INPUT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          output=$(./action.sh)
+          output=$(node index.js)
           echo "$output"
           echo "$output" | grep -q "PR: 39" || (echo "FAILED: Push event" && exit 1)
 
@@ -95,7 +95,7 @@ jobs:
           INPUT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          output=$(./action.sh)
+          output=$(node index.js)
           echo "$output"
           echo "$output" | grep -q "PR: 39" || (echo "FAILED: Release event" && exit 1)
 
@@ -107,7 +107,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           # This should fail (exit non-zero)
-          if ./action.sh; then
+          if node index.js; then
             echo "FAILED: Direct push should have failed"
             exit 1
           else
