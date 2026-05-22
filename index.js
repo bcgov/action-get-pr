@@ -5,23 +5,7 @@ async function main() {
   const token = process.env.INPUT_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
   const eventName = process.env.GITHUB_EVENT_NAME;
   const repository = process.env.GITHUB_REPOSITORY;
-  const eventAfter = process.env.GITHUB_EVENT_AFTER;
   const sha = process.env.GITHUB_SHA;
-  let eventNumber = process.env.GITHUB_EVENT_NUMBER || '';
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  if (!eventNumber && eventPath && fs.existsSync(eventPath)) {
-    try {
-      const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
-      if (payload.pull_request && payload.pull_request.number) {
-        eventNumber = String(payload.pull_request.number);
-      } else if (payload.number) {
-        eventNumber = String(payload.number);
-      }
-    } catch (e) {
-      if (debug) console.log(`DEBUG: Failed to parse event payload JSON: ${e.message}`);
-    }
-  }
-  const mergeGroupHeadRef = process.env.MERGE_GROUP_HEAD_REF;
 
   function logDebug(msg) {
     if (debug) console.log(`DEBUG: ${msg}`);
@@ -29,13 +13,40 @@ async function main() {
 
   logDebug(`Event: ${eventName}`);
 
+  // Load and parse event payload JSON natively if present
+  let payload = {};
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (eventPath && fs.existsSync(eventPath)) {
+    try {
+      payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+      logDebug(`Loaded event payload file successfully.`);
+    } catch (e) {
+      if (debug) console.log(`DEBUG: Failed to parse event payload JSON: ${e.message}`);
+    }
+  }
+
   let pr = '';
 
   if (eventName === 'pull_request') {
     console.log('Event type: pull request');
-    pr = eventNumber;
+    // Extract pull request number from payload
+    if (payload.pull_request && payload.pull_request.number) {
+      pr = String(payload.pull_request.number);
+    } else if (payload.number) {
+      pr = String(payload.number);
+    } else if (process.env.GITHUB_EVENT_NUMBER) {
+      pr = process.env.GITHUB_EVENT_NUMBER;
+    }
   } else if (eventName === 'merge_group') {
     console.log('Event type: merge queue');
+    // Sourced natively from GITHUB_EVENT_PATH event payload
+    let mergeGroupHeadRef = '';
+    if (payload.merge_group && payload.merge_group.head_ref) {
+      mergeGroupHeadRef = payload.merge_group.head_ref;
+    } else if (process.env.MERGE_GROUP_HEAD_REF) {
+      mergeGroupHeadRef = process.env.MERGE_GROUP_HEAD_REF;
+    }
+
     if (mergeGroupHeadRef) {
       // Format: queue/<branch>/pr-<number>
       const match = mergeGroupHeadRef.match(/^queue\/[^\/]+\/pr-(\d+)/);
@@ -43,9 +54,19 @@ async function main() {
     }
   } else if (eventName === 'push' || eventName === 'release' || eventName === 'workflow_dispatch') {
     console.log(`Event type: ${eventName}`);
-    const commitSha = eventName === 'push' ? eventAfter : sha;
     
+    // Resolve commit SHA
+    let commitSha = sha || '';
+    if (eventName === 'push') {
+      commitSha = payload.after || process.env.GITHUB_EVENT_AFTER || sha || '';
+    }
+
     if (commitSha && repository) {
+      if (!token) {
+        console.error('Error: github_token input or GITHUB_TOKEN environment variable is required to fetch PR from API.');
+        process.exit(1);
+      }
+
       const url = `https://api.github.com/repos/${repository}/commits/${commitSha}/pulls`;
       let attempt = 1;
       const maxAttempts = 3;
@@ -77,6 +98,12 @@ async function main() {
             } else {
               logDebug('API returned 200 but no associated pull request was found (indexing lag).');
             }
+          } else if (res.status === 401 || res.status === 403) {
+            console.error(`Error: API request failed with HTTP ${res.status} (Authentication/Permissions issue). Please verify inputs.github_token is configured with correct permissions.`);
+            process.exit(1);
+          } else if (res.status === 404) {
+            console.error(`Error: API request failed with HTTP 404 (Not Found). Please verify GITHUB_REPOSITORY and GITHUB_SHA / GITHUB_EVENT_AFTER are correct.`);
+            process.exit(1);
           } else {
             const bodyText = await res.text();
             console.error(`WARNING: API request failed with HTTP ${res.status}. Response: ${bodyText}`);
@@ -107,9 +134,9 @@ async function main() {
   console.log('Summary ---');
   console.log(`\tPR: ${pr}`);
 
-  // Output to GITHUB_OUTPUT
+  // Output to GITHUB_OUTPUT (Required token gate removed)
   const outputPath = process.env.GITHUB_OUTPUT;
-  if (outputPath && token) {
+  if (outputPath) {
     fs.appendFileSync(outputPath, `pr=${pr}\n`);
   }
 }
