@@ -56,7 +56,7 @@ async function main() {
   } else if (eventName === 'push' || eventName === 'release' || eventName === 'workflow_dispatch') {
     console.log(`Event type: ${eventName}`);
     
-    // Resolve commit SHA
+    // Resolve commit SHA (will look up via REST API, falling back to message parsing)
     let commitSha = sha || '';
     if (eventName === 'push') {
       commitSha = process.env.TEST_EVENT_AFTER || payload.after || process.env.GITHUB_EVENT_AFTER || sha || '';
@@ -80,6 +80,7 @@ async function main() {
           const controller = new AbortController();
           timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
+          // Execute fetch with custom headers and signal abort
           const res = await fetch(url, {
             headers: {
               'Accept': 'application/vnd.github+json',
