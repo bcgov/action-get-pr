@@ -1,0 +1,38 @@
+name: Merge
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  verify-merge-pr:
+    name: Verify Merge PR Lookup
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Run action-get-pr
+        id: get-pr
+        uses: ./
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print resolved PR
+        run: |
+          echo "Successfully resolved PR: ${{ steps.get-pr.outputs.pr }}"
+
+      - name: Notify Owners on Failure
+        if: failure()
+        uses: bcgov/actions/workflow-notifier@v0.1.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "Merge PR Lookup Failure: action-get-pr"
+          labels: "failure,bug"
