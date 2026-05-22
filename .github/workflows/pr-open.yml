@@ -149,7 +149,9 @@ jobs:
   # Gated on pull_request to prevent infinite recursive loop runs!
   test-real-dispatch:
     name: Test Real Dispatch
-    if: github.event_name == 'pull_request'
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     permissions:
       actions: write

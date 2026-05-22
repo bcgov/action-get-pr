@@ -21,7 +21,8 @@ async function main() {
       payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
       logDebug(`Loaded event payload file successfully.`);
     } catch (e) {
-      if (debug) console.log(`DEBUG: Failed to parse event payload JSON: ${e.message}`);
+      console.error(`Error: Failed to parse event payload JSON from '${eventPath}': ${e.message}`);
+      process.exit(1);
     }
   }
 
@@ -74,9 +75,10 @@ async function main() {
 
       while (attempt <= maxAttempts) {
         logDebug(`Fetching PR from API (attempt ${attempt}/${maxAttempts})...`);
+        let timeoutId;
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+          timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
           const res = await fetch(url, {
             headers: {
@@ -87,7 +89,6 @@ async function main() {
             },
             signal: controller.signal
           });
-          clearTimeout(timeoutId);
 
           logDebug(`API HTTP status: ${res.status}`);
           if (res.status === 200) {
@@ -110,6 +111,8 @@ async function main() {
           }
         } catch (err) {
           console.error(`WARNING: Fetch failed (network issue or timeout): ${err.message}`);
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
         }
 
         if (attempt < maxAttempts) {
@@ -118,6 +121,47 @@ async function main() {
           sleepMs *= 2; // Exponential backoff
         }
         attempt++;
+      }
+
+      // API fallback: If direct pulls association is empty (e.g. indexing lag or direct release tags),
+      // fetch commit details and parse the commit message for squash or standard merges.
+      if (!pr) {
+        logDebug('PR not found via direct pulls association. Attempting commit message parsing fallback...');
+        try {
+          const commitUrl = `https://api.github.com/repos/${repository}/commits/${commitSha}`;
+          const res = await fetch(commitUrl, {
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': `Bearer ${token}`,
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'action-get-pr-node'
+            }
+          });
+          if (res.status === 200) {
+            const commitData = await res.json();
+            const msg = commitData.commit && commitData.commit.message;
+            if (msg) {
+              logDebug(`Commit message: ${msg}`);
+              const firstLine = msg.split('\n')[0];
+              const squashMatch = firstLine.match(/\(#(\d+)\)$/);
+              const standardMatch = firstLine.match(/Merge pull request #(\d+)/i);
+              const generalMatch = msg.match(/PR #(\d+)/i);
+
+              if (squashMatch) {
+                pr = squashMatch[1];
+                logDebug(`Found PR #${pr} in squash commit message.`);
+              } else if (standardMatch) {
+                pr = standardMatch[1];
+                logDebug(`Found PR #${pr} in merge commit message.`);
+              } else if (generalMatch) {
+                pr = generalMatch[1];
+                logDebug(`Found PR #${pr} in full commit message.`);
+              }
+            }
+          }
+        } catch (e) {
+          logDebug(`Commit message fallback failed: ${e.message}`);
+        }
       }
     }
   } else {
