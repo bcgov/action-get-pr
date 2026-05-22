@@ -142,6 +142,15 @@ jobs:
             echo "PASSED: Direct push failed as expected!"
           fi
 
+      # Scenario 7: Renovate Dependency Dashboard filtering test
+      # When a Renovate Dependency Dashboard issue is opened/edited, the action must exit gracefully with code 0 (success).
+      - name: Test Dependency Dashboard issue filtering
+        run: |
+          echo '{"issue": {"title": "Dependency Dashboard"}}' > /tmp/event-renovate.json
+          TEST_EVENT_NAME=issues TEST_EVENT_PATH=/tmp/event-renovate.json node index.js > output.txt
+          cat output.txt
+          grep -q "Renovate Dependency Dashboard issue detected. Skipping gracefully." output.txt || (echo "FAILED: Dependency Dashboard filter" && exit 1)
+
   # Fully automated end-to-end integration test of a real workflow_dispatch.
   # When a PR check runs, this job triggers a real workflow_dispatch run of test-dispatch.yml,
   # watches the run to completion, and verifies its exit status.

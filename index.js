@@ -30,6 +30,13 @@ async function main() {
 
   if (eventName === 'pull_request') {
     console.log('Event type: pull request');
+    // Filter out Renovate Dependency Dashboard pull requests
+    const prTitle = (payload.pull_request && payload.pull_request.title) || payload.title;
+    if (prTitle && prTitle.includes('Dependency Dashboard')) {
+      console.log('Renovate Dependency Dashboard PR detected. Skipping gracefully.');
+      process.exit(0);
+    }
+
     // Extract pull request number from payload
     if (payload.pull_request && payload.pull_request.number) {
       pr = String(payload.pull_request.number);
@@ -38,6 +45,16 @@ async function main() {
     } else if (process.env.GITHUB_EVENT_NUMBER) {
       pr = process.env.GITHUB_EVENT_NUMBER;
     }
+  } else if (eventName === 'issues') {
+    console.log('Event type: issues');
+    // Filter out Renovate Dependency Dashboard issues
+    const issueTitle = payload.issue && payload.issue.title;
+    if (issueTitle && issueTitle.includes('Dependency Dashboard')) {
+      console.log('Renovate Dependency Dashboard issue detected. Skipping gracefully.');
+      process.exit(0);
+    }
+    console.error('Error: Standard issues do not have pull request numbers.');
+    process.exit(1);
   } else if (eventName === 'merge_group') {
     console.log('Event type: merge queue');
     // Sourced natively from event payload
@@ -95,6 +112,11 @@ async function main() {
           if (res.status === 200) {
             const body = await res.json();
             if (body && body[0] && body[0].number) {
+              const prTitle = body[0].title;
+              if (prTitle && prTitle.includes('Dependency Dashboard')) {
+                console.log('Renovate Dependency Dashboard PR detected via API. Skipping gracefully.');
+                process.exit(0);
+              }
               pr = String(body[0].number);
               break;
             } else {
