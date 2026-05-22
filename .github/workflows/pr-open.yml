@@ -27,7 +27,7 @@ jobs:
           echo "github.event.action: ${{ github.event.action }}"
           echo "${GITHUB_CONTEXT}" | jq .
 
-  # Test for PR, merge queue and merge to main
+  # Test for PR, merge queue and merge to main using standard composite action call
   get-pr:
     name: Get PR number
     runs-on: ubuntu-24.04
@@ -38,6 +38,7 @@ jobs:
       - id: vars
         uses: ./
 
+  # Verify standard end-to-end pull request scenario output
   verify-pr:
     name: Verify PR number
     needs: [get-pr]
@@ -52,13 +53,17 @@ jobs:
             (echo "No PR number" && exit 1)
           echo "PR: ${{ env.pr }}"
 
-  # Comprehensive offline and online API scenario testing
+  # Comprehensive mock integration test suite.
+  # We mock standard GitHub Actions environment variables to test all code paths.
+  # For network queries, we perform live integration tests querying THIS repo's own Git history!
   test-scenarios:
     name: Test Scenarios
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
+      # Scenario 1: Mock a standard pull request event
+      # Checks local env variable lookup (zero network overhead, 100% deterministic)
       - name: Test PR event
         env:
           GITHUB_EVENT_NAME: pull_request
@@ -68,6 +73,8 @@ jobs:
           echo "$output"
           echo "$output" | grep -q "PR: 40" || (echo "FAILED: PR event" && exit 1)
 
+      # Scenario 2: Mock a Merge Queue event
+      # Checks local branch name regex extraction (zero network overhead)
       - name: Test Merge Queue event
         env:
           GITHUB_EVENT_NAME: merge_group
@@ -77,6 +84,9 @@ jobs:
           echo "$output"
           echo "$output" | grep -q "PR: 40" || (echo "FAILED: Merge Queue event" && exit 1)
 
+      # Scenario 3: Live API integration test for a Push event (PR Merge)
+      # We target PR #39 inside this repository (bcgov/action-get-pr).
+      # The official squash commit SHA for PR #39 is 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412.
       - name: Test Push event (PR Merge)
         env:
           GITHUB_EVENT_NAME: push
@@ -88,6 +98,8 @@ jobs:
           echo "$output"
           echo "$output" | grep -q "PR: 39" || (echo "FAILED: Push event" && exit 1)
 
+      # Scenario 4: Live API integration test for a Release event
+      # We target the same merged commit SHA (8f9a16a...) for PR #39.
       - name: Test Release event (PR Merge)
         env:
           GITHUB_EVENT_NAME: release
@@ -99,6 +111,8 @@ jobs:
           echo "$output"
           echo "$output" | grep -q "PR: 39" || (echo "FAILED: Release event" && exit 1)
 
+      # Scenario 5: Live API integration test for manual Workflow Dispatch event
+      # We target the same merged commit SHA (8f9a16a...) for PR #39.
       - name: Test Workflow Dispatch event (PR Merge)
         env:
           GITHUB_EVENT_NAME: workflow_dispatch
@@ -110,6 +124,9 @@ jobs:
           echo "$output"
           echo "$output" | grep -q "PR: 39" || (echo "FAILED: Workflow Dispatch event" && exit 1)
 
+      # Scenario 6: Direct Push / Cowboy Protection fail-fast test
+      # We mock a direct push to main with a fake commit SHA (0000000...) that has no PR.
+      # The action must exit non-zero (fail), proving direct pushes are blocked from deployments!
       - name: Test Direct Push (Cowboy Fail-Fast)
         env:
           GITHUB_EVENT_NAME: push
