@@ -5,6 +5,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -86,12 +87,11 @@ jobs:
           grep -q "PR: 40" output.txt || (echo "FAILED: Merge Queue event" && exit 1)
 
       # Scenario 3: Live API integration test for a Push event (PR Merge)
-      # We target PR #39 inside this repository (bcgov/action-get-pr).
-      # The official squash commit SHA for PR #39 is 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412.
+      # We target the actual squash-merged commit SHA of PR #39: 8f9a16a1f7a7574b10e2fb473bfef0c4c4fff3d6.
       - name: Test Push event (PR Merge)
         env:
           TEST_EVENT_NAME: push
-          TEST_EVENT_AFTER: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
+          TEST_EVENT_AFTER: 8f9a16a1f7a7574b10e2fb473bfef0c4c4fff3d6
           INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TEST_REPOSITORY: ${{ github.repository }}
         run: |
@@ -100,11 +100,11 @@ jobs:
           echo "$output" | grep -q "PR: 39" || (echo "FAILED: Push event" && exit 1)
 
       # Scenario 4: Live API integration test for a Release event
-      # We target the same merged commit SHA (8f9a16a...) for PR #39.
+      # We target the same historical commit SHA of PR #39 (associated with tag v0.2.1).
       - name: Test Release event (PR Merge)
         env:
           TEST_EVENT_NAME: release
-          TEST_SHA: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
+          TEST_SHA: 8f9a16a1f7a7574b10e2fb473bfef0c4c4fff3d6
           INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TEST_REPOSITORY: ${{ github.repository }}
         run: |
@@ -113,11 +113,11 @@ jobs:
           echo "$output" | grep -q "PR: 39" || (echo "FAILED: Release event" && exit 1)
 
       # Scenario 5: Live API integration test for manual Workflow Dispatch event
-      # We target the same merged commit SHA (8f9a16a...) for PR #39.
+      # We target the same historical commit SHA of PR #39.
       - name: Test Workflow Dispatch event (PR Merge)
         env:
           TEST_EVENT_NAME: workflow_dispatch
-          TEST_SHA: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
+          TEST_SHA: 8f9a16a1f7a7574b10e2fb473bfef0c4c4fff3d6
           INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TEST_REPOSITORY: ${{ github.repository }}
         run: |
