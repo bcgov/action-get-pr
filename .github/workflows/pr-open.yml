@@ -99,6 +99,17 @@ jobs:
           echo "$output"
           echo "$output" | grep -q "PR: 39" || (echo "FAILED: Release event" && exit 1)
 
+      - name: Test Workflow Dispatch event (PR Merge)
+        env:
+          GITHUB_EVENT_NAME: workflow_dispatch
+          GITHUB_SHA: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
+          INPUT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          output=$(node index.js)
+          echo "$output"
+          echo "$output" | grep -q "PR: 39" || (echo "FAILED: Workflow Dispatch event" && exit 1)
+
       - name: Test Direct Push (Cowboy Fail-Fast)
         env:
           GITHUB_EVENT_NAME: push
