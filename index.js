@@ -100,15 +100,15 @@ async function main() {
     }
 
     if (commitSha && repository) {
-      // Tier 1: Fetch commit details from GitHub API (only requires contents:read)
+      // TIER 1: Fetch associated pull requests directly from GitHub API (requires pull-requests:read)
       if (token) {
-        const url = `https://api.github.com/repos/${repository}/commits/${commitSha}`;
+        const url = `https://api.github.com/repos/${repository}/commits/${commitSha}/pulls`;
         let attempt = 1;
         const maxAttempts = 3;
         let sleepMs = 2000;
 
         while (attempt <= maxAttempts) {
-          logDebug(`Fetching commit details from API (attempt ${attempt}/${maxAttempts})...`);
+          logDebug(`Tier 1: Fetching PR from API (attempt ${attempt}/${maxAttempts})...`);
           let timeoutId;
           try {
             const controller = new AbortController();
@@ -124,37 +124,24 @@ async function main() {
               signal: controller.signal
             });
 
-            logDebug(`API HTTP status: ${res.status}`);
+            logDebug(`Tier 1: API HTTP status: ${res.status}`);
             if (res.status === 200) {
-              const commitData = await res.json();
-              const msg = commitData.commit && commitData.commit.message;
-              if (msg) {
-                logDebug(`Commit message: ${msg}`);
-                const firstLine = msg.split('\n')[0];
-                const squashMatch = firstLine.match(/\(#(\d+)\)$/);
-                const standardMatch = firstLine.match(/Merge pull request #(\d+)/i);
-                const generalMatch = msg.match(/PR #(\d+)/i);
-
-                if (squashMatch) {
-                  pr = squashMatch[1];
-                  logDebug(`Found PR #${pr} in squash commit message.`);
-                  break;
-                } else if (standardMatch) {
-                  pr = standardMatch[1];
-                  logDebug(`Found PR #${pr} in merge commit message.`);
-                  break;
-                } else if (generalMatch) {
-                  pr = generalMatch[1];
-                  logDebug(`Found PR #${pr} in commit message.`);
-                  break;
-                }
+              const body = await res.json();
+              if (body && body[0] && body[0].number) {
+                pr = String(body[0].number);
+                break;
+              } else {
+                logDebug('Tier 1: API returned 200 but no associated pull request was found (indexing lag).');
               }
+            } else if (res.status === 401 || res.status === 403) {
+              logDebug(`Tier 1: API request returned HTTP ${res.status} (Restricted permissions). Soft-falling back to Tier 2...`);
+              break; // Quietly break to fall back to Tier 2
             } else {
-              logDebug(`API returned non-200 status: ${res.status}`);
-              break; // Don't retry auth or resource errors
+              logDebug(`Tier 1: API returned unexpected status: ${res.status}`);
+              break;
             }
           } catch (err) {
-            logDebug(`WARNING: Fetch failed (attempt ${attempt}): ${err.message}`);
+            logDebug(`Tier 1: Fetch failed (attempt ${attempt}): ${err.message}`);
           } finally {
             if (timeoutId) clearTimeout(timeoutId);
           }
@@ -166,13 +153,53 @@ async function main() {
           }
           attempt++;
         }
-      } else {
-        logDebug('No token provided. Skipping API commit details lookup.');
       }
 
-      // Tier 2: Offline Fallback (Local git log)
+      // TIER 2: Fetch commit details from GitHub API (only requires default contents:read)
+      if (!pr && token) {
+        logDebug('Tier 2: Attempting commit details API fallback...');
+        try {
+          const commitUrl = `https://api.github.com/repos/${repository}/commits/${commitSha}`;
+          const res = await fetch(commitUrl, {
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': `Bearer ${token}`,
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'action-get-pr-node'
+            }
+          });
+          
+          logDebug(`Tier 2: API HTTP status: ${res.status}`);
+          if (res.status === 200) {
+            const commitData = await res.json();
+            const msg = commitData.commit && commitData.commit.message;
+            if (msg) {
+              logDebug(`Tier 2: Commit message: ${msg}`);
+              const firstLine = msg.split('\n')[0];
+              const squashMatch = firstLine.match(/\(#(\d+)\)$/);
+              const standardMatch = firstLine.match(/Merge pull request #(\d+)/i);
+              const generalMatch = msg.match(/PR #(\d+)/i);
+
+              if (squashMatch) {
+                pr = squashMatch[1];
+                logDebug(`Tier 2: Found PR #${pr} in squash commit message.`);
+              } else if (standardMatch) {
+                pr = standardMatch[1];
+                logDebug(`Tier 2: Found PR #${pr} in merge commit message.`);
+              } else if (generalMatch) {
+                pr = generalMatch[1];
+                logDebug(`Tier 2: Found PR #${pr} in commit message.`);
+              }
+            }
+          }
+        } catch (e) {
+          logDebug(`Tier 2: Commit details fallback failed: ${e.message}`);
+        }
+      }
+
+      // TIER 3: Offline Fallback (Local git log)
       if (!pr && fs.existsSync('.git')) {
-        logDebug('Attempting local git history fallback...');
+        logDebug('Tier 3: Attempting local git history fallback...');
         try {
           const { execSync } = require('child_process');
           const commitsToSearch = eventName === 'workflow_dispatch' ? 10 : 1;
@@ -186,20 +213,20 @@ async function main() {
 
             if (squashMatch) {
               pr = squashMatch[1];
-              logDebug(`Found PR #${pr} in local squash commit message.`);
+              logDebug(`Tier 3: Found PR #${pr} in local squash commit message.`);
               break;
             } else if (standardMatch) {
               pr = standardMatch[1];
-              logDebug(`Found PR #${pr} in local merge commit message.`);
+              logDebug(`Tier 3: Found PR #${pr} in local merge commit message.`);
               break;
             } else if (generalMatch) {
               pr = generalMatch[1];
-              logDebug(`Found PR #${pr} in local commit message.`);
+              logDebug(`Tier 3: Found PR #${pr} in local commit message.`);
               break;
             }
           }
         } catch (e) {
-          logDebug(`Local git history fallback failed: ${e.message}`);
+          logDebug(`Tier 3: Local git history fallback failed: ${e.message}`);
         }
       }
     }
