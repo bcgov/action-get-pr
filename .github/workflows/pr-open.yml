@@ -5,7 +5,6 @@ on:
   pull_request:
   push:
     branches: [main]
-  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -144,9 +143,11 @@ jobs:
           fi
 
   # Fully automated end-to-end integration test of a real workflow_dispatch.
-  # When a PR check runs, this job triggers a real workflow_dispatch run of pr-open.yml,
+  # When a PR check runs, this job triggers a real workflow_dispatch run of test-dispatch.yml,
   # watches the run to completion, and verifies its exit status.
-  # Gated on pull_request to prevent infinite recursive loop runs!
+  # Gated on same-repo pull_requests to prevent failures on external fork PRs.
+  # Note: The very first run on this PR will fail on GHA because test-dispatch.yml isn't on main yet.
+  # Once merged to main, this will execute successfully on every future same-repo PR.
   test-real-dispatch:
     name: Test Real Dispatch
     if: |
@@ -165,8 +166,8 @@ jobs:
         run: |
           ref="${{ github.event.pull_request.head.ref || github.head_ref }}"
           echo "Triggering workflow_dispatch on branch: $ref"
-          # Programmatically dispatch the pr-open.yml workflow using the GitHub CLI
-          gh workflow run pr-open.yml --ref "$ref"
+          # Programmatically dispatch the test-dispatch.yml workflow using the GitHub CLI
+          gh workflow run test-dispatch.yml --ref "$ref"
           
           # Sleep to let the runner API register the dispatch event
           sleep 5
@@ -174,7 +175,7 @@ jobs:
           echo "Polling GitHub API for the newly triggered run ID..."
           run_id=""
           for i in {1..10}; do
-            run_id=$(gh run list --workflow=pr-open.yml --branch="$ref" --event=workflow_dispatch --limit=1 --json databaseId --jq '.[0].databaseId')
+            run_id=$(gh run list --workflow=test-dispatch.yml --branch="$ref" --event=workflow_dispatch --limit=1 --json databaseId --jq '.[0].databaseId')
             if [ ! -z "$run_id" ]; then
               echo "Found triggered run ID: $run_id"
               break
