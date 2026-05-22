@@ -142,14 +142,21 @@ jobs:
             echo "PASSED: Direct push failed as expected!"
           fi
 
-      # Scenario 7: Renovate Dependency Dashboard filtering test
-      # When a Renovate Dependency Dashboard issue is opened/edited, the action must exit gracefully with code 0 (success).
-      - name: Test Dependency Dashboard issue filtering
+      # Scenario 7: Issues ignore list filtering tests (rules.yml)
+      # When a configured issue title is opened/edited, the action must exit gracefully with code 0 (success).
+      - name: Test issue ignore list filtering
         run: |
+          # Test Renovate Dependency Dashboard
           echo '{"issue": {"title": "Dependency Dashboard"}}' > /tmp/event-renovate.json
           TEST_EVENT_NAME=issues TEST_EVENT_PATH=/tmp/event-renovate.json node index.js > output.txt
           cat output.txt
-          grep -q "Renovate Dependency Dashboard issue detected. Skipping gracefully." output.txt || (echo "FAILED: Dependency Dashboard filter" && exit 1)
+          grep -q 'Ignore rule matched for "Dependency Dashboard"' output.txt || (echo "FAILED: Dependency Dashboard filter" && exit 1)
+
+          # Test ZAP Security Report
+          echo '{"issue": {"title": "ZAP Security Report"}}' > /tmp/event-zap.json
+          TEST_EVENT_NAME=issues TEST_EVENT_PATH=/tmp/event-zap.json node index.js > output.txt
+          cat output.txt
+          grep -q 'Ignore rule matched for "ZAP Security Report"' output.txt || (echo "FAILED: ZAP Security Report filter" && exit 1)
 
   # Fully automated end-to-end integration test of a real workflow_dispatch.
   # When a PR check runs, this job triggers a real workflow_dispatch run of test-dispatch.yml,

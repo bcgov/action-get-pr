@@ -40,11 +40,38 @@ async function main() {
     }
   } else if (eventName === 'issues') {
     console.log('Event type: issues');
-    // Filter out Renovate Dependency Dashboard issues
     const issueTitle = payload.issue && payload.issue.title;
-    if (issueTitle && issueTitle.includes('Dependency Dashboard')) {
-      console.log('Renovate Dependency Dashboard issue detected. Skipping gracefully.');
-      process.exit(0);
+
+    // Load ignore rules dynamically from rules.yml (dependency-free parser)
+    let ignoreTitles = [];
+    const rulesPath = 'rules.yml';
+    if (fs.existsSync(rulesPath)) {
+      try {
+        const content = fs.readFileSync(rulesPath, 'utf8');
+        const lines = content.split('\n');
+        for (const line of lines) {
+          const match = line.match(/^\s*-\s*["']?([^"'\r\n]+)["']?/);
+          if (match) {
+            ignoreTitles.push(match[1].trim());
+          }
+        }
+      } catch (e) {
+        logDebug(`Failed to parse rules.yml: ${e.message}`);
+      }
+    }
+
+    // Default fallbacks if rules.yml is missing or empty
+    if (ignoreTitles.length === 0) {
+      ignoreTitles = ['Dependency Dashboard', 'ZAP Security Report'];
+    }
+
+    if (issueTitle) {
+      for (const title of ignoreTitles) {
+        if (issueTitle.includes(title)) {
+          console.log(`Ignore rule matched for "${title}". Skipping gracefully.`);
+          process.exit(0);
+        }
+      }
     }
     console.error('Error: Standard issues do not have pull request numbers.');
     process.exit(1);
