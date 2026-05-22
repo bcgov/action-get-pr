@@ -27,10 +27,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v6
-      with:
-        token: ${{ inputs.github_token }}
-
     - id: vars
       shell: bash
       env:
