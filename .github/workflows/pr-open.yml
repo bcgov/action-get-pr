@@ -48,6 +48,68 @@ jobs:
       - name: Verify PR number
         run: |
           # Check needs.get-pr.outputs.pr
-          [ ! -z ${{ env.pr }} ]|| \
+          [ ! -z "${{ env.pr }}" ] || \
             (echo "No PR number" && exit 1)
           echo "PR: ${{ env.pr }}"
+
+  # Comprehensive offline and online API scenario testing
+  test-scenarios:
+    name: Test Scenarios
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Test PR event
+        env:
+          GITHUB_EVENT_NAME: pull_request
+          GITHUB_EVENT_NUMBER: "40"
+        run: |
+          output=$(./action.sh)
+          echo "$output"
+          echo "$output" | grep -q "PR: 40" || (echo "FAILED: PR event" && exit 1)
+
+      - name: Test Merge Queue event
+        env:
+          GITHUB_EVENT_NAME: merge_group
+          MERGE_GROUP_HEAD_REF: queue/main/pr-40-abcdef
+        run: |
+          output=$(./action.sh)
+          echo "$output"
+          echo "$output" | grep -q "PR: 40" || (echo "FAILED: Merge Queue event" && exit 1)
+
+      - name: Test Push event (PR Merge)
+        env:
+          GITHUB_EVENT_NAME: push
+          GITHUB_EVENT_AFTER: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
+          INPUT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          output=$(./action.sh)
+          echo "$output"
+          echo "$output" | grep -q "PR: 39" || (echo "FAILED: Push event" && exit 1)
+
+      - name: Test Release event (PR Merge)
+        env:
+          GITHUB_EVENT_NAME: release
+          GITHUB_SHA: 8f9a16a04f2ee7dfbd1a7c51cb9c1cb3b1772412
+          INPUT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          output=$(./action.sh)
+          echo "$output"
+          echo "$output" | grep -q "PR: 39" || (echo "FAILED: Release event" && exit 1)
+
+      - name: Test Direct Push (Cowboy Fail-Fast)
+        env:
+          GITHUB_EVENT_NAME: push
+          GITHUB_EVENT_AFTER: 0000000000000000000000000000000000000000
+          INPUT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          # This should fail (exit non-zero)
+          if ./action.sh; then
+            echo "FAILED: Direct push should have failed"
+            exit 1
+          else
+            echo "PASSED: Direct push failed as expected!"
+          fi
