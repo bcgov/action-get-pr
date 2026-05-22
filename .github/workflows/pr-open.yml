@@ -142,3 +142,51 @@ jobs:
           else
             echo "PASSED: Direct push failed as expected!"
           fi
+
+  # Fully automated end-to-end integration test of a real workflow_dispatch.
+  # When a PR check runs, this job triggers a real workflow_dispatch run of pr-open.yml,
+  # watches the run to completion, and verifies its exit status.
+  # Gated on pull_request to prevent infinite recursive loop runs!
+  test-real-dispatch:
+    name: Test Real Dispatch
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Trigger, watch, and verify real workflow_dispatch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ref="${{ github.event.pull_request.head.ref || github.head_ref }}"
+          echo "Triggering workflow_dispatch on branch: $ref"
+          gh workflow run pr-open.yml --ref "$ref"
+          
+          # Sleep to let the runner API register the dispatch event
+          sleep 5
+          
+          echo "Polling GitHub API for the newly triggered run ID..."
+          run_id=""
+          for i in {1..10}; do
+            run_id=$(gh run list --workflow=pr-open.yml --branch="$ref" --event=workflow_dispatch --limit=1 --json databaseId --jq '.[0].databaseId')
+            if [ ! -z "$run_id" ]; then
+              echo "Found triggered run ID: $run_id"
+              break
+            fi
+            echo "Waiting for run to register..."
+            sleep 3
+          done
+          
+          if [ -z "$run_id" ]; then
+            echo "FAILED: Could not find triggered workflow run in API"
+            exit 1
+          fi
+          
+          echo "Watching workflow run $run_id..."
+          gh run watch "$run_id"
+          
+          echo "Verifying run execution completed successfully..."
+          gh run view "$run_id" --exit-status
