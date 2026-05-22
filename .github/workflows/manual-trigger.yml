@@ -1,0 +1,22 @@
+name: Manual Trigger
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run-action:
+    name: Run action on manual dispatch
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Get PR number
+        id: pr_resolver
+        uses: ./
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Return Resolved PR
+        run: |
+          echo "The last resolved PR was: ${{ steps.pr_resolver.outputs.pr }}"
