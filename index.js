@@ -141,7 +141,8 @@ async function main() {
               break;
             }
           } catch (err) {
-            logDebug(`Tier 1: Fetch failed (attempt ${attempt}): ${err.message}`);
+            const errMsg = err?.message ?? String(err);
+            logDebug(`Tier 1: Fetch failed (attempt ${attempt}): ${errMsg}`);
           } finally {
             if (timeoutId) clearTimeout(timeoutId);
           }
@@ -193,7 +194,8 @@ async function main() {
             }
           }
         } catch (e) {
-          logDebug(`Tier 2: Commit details fallback failed: ${e.message}`);
+          const errMsg = e?.message ?? String(e);
+          logDebug(`Tier 2: Commit details fallback failed: ${errMsg}`);
         }
       }
 
@@ -226,7 +228,8 @@ async function main() {
             }
           }
         } catch (e) {
-          logDebug(`Tier 3: Local git history fallback failed: ${e.message}`);
+          const errMsg = e?.message ?? String(e);
+          logDebug(`Tier 3: Local git history fallback failed: ${errMsg}`);
         }
       }
     }
@@ -252,6 +255,7 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error(`Fatal error: ${err.message}`);
+  const errMsg = err?.message ?? String(err);
+  console.error(`Fatal error: ${errMsg}`);
   process.exit(1);
 });
