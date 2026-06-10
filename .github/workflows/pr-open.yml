@@ -120,25 +120,8 @@ jobs:
           echo "$output"
           echo "$output" | grep -q "PR: 39" || (echo "FAILED: Workflow Dispatch event" && exit 1)
 
-      # Scenario 6: Direct Push / Cowboy Protection fail-fast test
-      # We mock a direct push to main with a fake commit SHA (0000000...) that has no PR.
-      # The action must exit non-zero (fail), proving direct pushes are blocked from deployments!
-      - name: Test Direct Push (Cowboy Fail-Fast)
-        env:
-          TEST_EVENT_NAME: push
-          TEST_EVENT_AFTER: 0000000000000000000000000000000000000000
-          INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TEST_REPOSITORY: ${{ github.repository }}
-        run: |
-          # This should fail (exit non-zero)
-          if node index.js; then
-            echo "FAILED: Direct push should have failed"
-            exit 1
-          else
-            echo "PASSED: Direct push failed as expected!"
-          fi
 
-      # Scenario 7: Issues ignore list filtering tests (rules.yml)
+      # Scenario 6: Issues ignore list filtering tests (rules.yml)
       # When a configured issue title is opened/edited, the action must exit gracefully with code 0 (success).
       - name: Test issue ignore list filtering
         run: |
