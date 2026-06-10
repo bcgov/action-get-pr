@@ -76,14 +76,10 @@ jobs:
           cat output.txt
           grep -q "PR: 40" output.txt || (echo "FAILED: PR event" && exit 1)
 
-      # Scenario 2: Mock a Merge Queue event
-      # We generate a minimal JSON event payload on disk to test native payload parsing.
-      - name: Test Merge Queue event
-        run: |
-          echo '{"merge_group": {"head_ref": "queue/main/pr-40-abcdef"}}' > /tmp/event-mq.json
-          TEST_EVENT_NAME=merge_group TEST_EVENT_PATH=/tmp/event-mq.json node index.js > output.txt
-          cat output.txt
-          grep -q "PR: 40" output.txt || (echo "FAILED: Merge Queue event" && exit 1)
+      # No merge_group mock: the get-pr job above runs the real action against the
+      # actual merge_group event when a PR is queued. Requiring the merge queue in
+      # branch protection means every merge is a live integration test of this path.
+
 
       # Scenario 3: Live API integration test for a Push event (PR Merge)
       # We target the actual squash-merged commit SHA of PR #39: 8f9a16a1f7a7574b10e2fb473bfef0c4c4fff3d6.
