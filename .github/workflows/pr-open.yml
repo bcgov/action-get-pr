@@ -121,7 +121,7 @@ jobs:
           echo "$output" | grep -q "PR: 39" || (echo "FAILED: Workflow Dispatch event" && exit 1)
 
 
-      # Scenario 7: Issues ignore list filtering tests (rules.yml)
+      # Scenario 6: Issues ignore list filtering tests (rules.yml)
       # When a configured issue title is opened/edited, the action must exit gracefully with code 0 (success).
       - name: Test issue ignore list filtering
         run: |
