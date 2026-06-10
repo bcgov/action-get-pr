@@ -76,36 +76,10 @@ jobs:
           cat output.txt
           grep -q "PR: 40" output.txt || (echo "FAILED: PR event" && exit 1)
 
-      # Scenario 2a: Mock a Merge Queue event using the real GitHub payload format.
-      # GitHub sets merge_group.head_ref to refs/heads/gh-readonly-queue/<base>/pr-<N>-<sha>.
-      # This is the format that was broken prior to the fix in index.js.
-      - name: Test Merge Queue event (real GitHub format)
-        run: |
-          set -euo pipefail
-          echo '{"merge_group": {"head_ref": "refs/heads/gh-readonly-queue/main/pr-40-abcdef123"}}' > /tmp/event-mq-real.json
-          TEST_EVENT_NAME=merge_group TEST_EVENT_PATH=/tmp/event-mq-real.json node index.js > output.txt
-          cat output.txt
-          grep -q "PR: 40" output.txt || (echo "FAILED: Merge Queue event (real GitHub format)" && exit 1)
+      # No merge_group mock: the get-pr job above runs the real action against the
+      # actual merge_group event when a PR is queued. Requiring the merge queue in
+      # branch protection means every merge is a live integration test of this path.
 
-      # Scenario 2b: Legacy merge queue payload format backward-compat check.
-      # Some environments may still emit queue/<branch>/pr-<N> without the refs/heads prefix.
-      - name: Test Merge Queue event (legacy format)
-        run: |
-          set -euo pipefail
-          echo '{"merge_group": {"head_ref": "queue/main/pr-40"}}' > /tmp/event-mq-legacy.json
-          TEST_EVENT_NAME=merge_group TEST_EVENT_PATH=/tmp/event-mq-legacy.json node index.js > output.txt
-          cat output.txt
-          grep -q "PR: 40" output.txt || (echo "FAILED: Merge Queue event (legacy format)" && exit 1)
-
-      # Scenario 2c: Merge Queue via MERGE_GROUP_HEAD_REF env var (no payload file).
-      # This exercises the env-var fallback path when no event payload file is provided.
-      - name: Test Merge Queue event (MERGE_GROUP_HEAD_REF env var)
-        run: |
-          set -euo pipefail
-          MERGE_GROUP_HEAD_REF="refs/heads/gh-readonly-queue/main/pr-40-abcdef123" \
-            TEST_EVENT_NAME=merge_group node index.js > output.txt
-          cat output.txt
-          grep -q "PR: 40" output.txt || (echo "FAILED: Merge Queue event (MERGE_GROUP_HEAD_REF env var)" && exit 1)
 
       # Scenario 3: Live API integration test for a Push event (PR Merge)
       # We target the actual squash-merged commit SHA of PR #39: 8f9a16a1f7a7574b10e2fb473bfef0c4c4fff3d6.
