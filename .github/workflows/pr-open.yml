@@ -97,8 +97,8 @@ jobs:
           cat output.txt
           grep -q "PR: 40" output.txt || (echo "FAILED: Merge Queue event (legacy format)" && exit 1)
 
-      # Scenario 2c: Merge Queue via GITHUB_REF env var (no payload file).
-      # MERGE_GROUP_HEAD_REF is non-standard; GITHUB_REF is what GitHub actually sets.
+      # Scenario 2c: Merge Queue via MERGE_GROUP_HEAD_REF env var (no payload file).
+      # This exercises the env-var fallback path when no event payload file is provided.
       - name: Test Merge Queue event (MERGE_GROUP_HEAD_REF env var)
         run: |
           set -euo pipefail
