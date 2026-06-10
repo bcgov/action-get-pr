@@ -86,8 +86,9 @@ async function main() {
     }
 
     if (mergeGroupHeadRef) {
-      // Format: queue/<branch>/pr-<number>
-      const match = mergeGroupHeadRef.match(/^queue\/[^\/]+\/pr-(\d+)/);
+      // Matches both the old format (queue/<branch>/pr-<number>)
+      // and the current GitHub format (refs/heads/gh-readonly-queue/<branch>/pr-<number>-<sha>)
+      const match = mergeGroupHeadRef.match(/\/pr-(\d+)(?:-[0-9a-f]+)?$/);
       if (match) pr = match[1];
     }
   } else if (eventName === 'push' || eventName === 'release' || eventName === 'workflow_dispatch') {
