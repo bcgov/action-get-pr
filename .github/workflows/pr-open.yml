@@ -123,7 +123,11 @@ jobs:
       # Scenario 6: Direct Push / Cowboy Protection fail-fast test
       # We mock a direct push to main with a fake commit SHA (0000000...) that has no PR.
       # The action must exit non-zero (fail), proving direct pushes are blocked from deployments!
+      # Skipped on merge_group: the queue creates a synthetic commit whose message contains
+      # the PR number, so Tier 3 (git log fallback) finds it even for a fake SHA — which is
+      # correct action behaviour, but defeats the point of this test.
       - name: Test Direct Push (Cowboy Fail-Fast)
+        if: github.event_name == 'pull_request'
         env:
           TEST_EVENT_NAME: push
           TEST_EVENT_AFTER: 0000000000000000000000000000000000000000
