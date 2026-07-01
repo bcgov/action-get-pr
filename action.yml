@@ -1,5 +1,5 @@
 name: Get PR Number
-description: "Deprecated: Use bcgov/actions/get-pr instead"
+description: "This Action has moved to bcgov/actions/get-pr"
 branding:
   icon: package
   color: blue
@@ -20,10 +20,10 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Deprecation Warning
+    - name: Migration Warning
       shell: bash
       run: |
-        echo "::warning::This repository is deprecated. Please update your workflow to use bcgov/actions/get-pr instead."
+        echo "::warning::This Action has moved to bcgov/actions/get-pr. Please update your workflow to use bcgov/actions/get-pr instead."
     - name: Delegate to consolidated action
       id: get_pr
       uses: bcgov/actions/get-pr@v0.2.0
