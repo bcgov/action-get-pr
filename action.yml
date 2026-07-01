@@ -1,5 +1,5 @@
 name: Get PR Number
-description: Get PR number for merge queues, squash merges, and releases
+description: "This Action has moved to bcgov/actions/get-pr"
 branding:
   icon: package
   color: blue
@@ -15,7 +15,18 @@ inputs:
 outputs:
   pr:
     description: "Associated pull request number"
+    value: ${{ steps.get_pr.outputs.pr }}
 
 runs:
-  using: node24
-  main: index.js
+  using: composite
+  steps:
+    - name: Migration Warning
+      shell: bash
+      run: |
+        echo "::warning::This Action has moved to bcgov/actions/get-pr. Please update your workflow to use bcgov/actions/get-pr instead."
+    - name: Delegate to consolidated action
+      id: get_pr
+      uses: bcgov/actions/get-pr@v0.2.0
+      with:
+        debug: ${{ inputs.debug }}
+        github_token: ${{ inputs.github_token }}
