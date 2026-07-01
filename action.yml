@@ -26,7 +26,7 @@ runs:
         echo "::warning::This repository is deprecated. Please update your workflow to use bcgov/actions/get-pr instead."
     - name: Delegate to consolidated action
       id: get_pr
-      uses: bcgov/actions/get-pr@v0.1.0
+      uses: bcgov/actions/get-pr@v0.2.0
       with:
         debug: ${{ inputs.debug }}
         github_token: ${{ inputs.github_token }}
