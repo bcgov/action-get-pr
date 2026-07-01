@@ -6,6 +6,10 @@
 
 # Get PR Number - Merges and Queues
 
+> [!WARNING]
+> **DEPRECATION NOTICE**: This repository is deprecated and its logic has been consolidated into the centralized [bcgov/actions](https://github.com/bcgov/actions) monorepo. Please migrate your workflows to use **`bcgov/actions/get-pr`** instead.
+
+
 PR numbers are easy to come by in PRs, but passing those same numbers to releases, merge queues and PR-backed merges can get tricky. This action makes that convenient in the following cases:
 * PR merge queues
 * Merged PR workflows
