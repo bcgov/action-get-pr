@@ -31,7 +31,7 @@ jobs:
 
       - name: Notify Owners on Failure
         if: failure()
-        uses: bcgov/actions/workflow-notifier@v0.6.0
+        uses: bcgov/actions/workflow-notifier@v0.7.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "Merge PR Lookup Failure: action-get-pr"
