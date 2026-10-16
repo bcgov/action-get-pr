@@ -1,7 +1,7 @@
 const fs = require('fs');
 
 async function main() {
-  console.log("::warning::This Action has moved to bcgov/actions/image-tracker. Please update your workflow to use bcgov/actions/image-tracker instead. See: https://github.com/bcgov/actions/tree/main/image-tracker");
+  console.log("::warning title=Action moved::This Action has moved to bcgov/actions/image-tracker. Update workflows to bcgov/actions/image-tracker (pin a release, not @main). Renames: github_token → token; package is required. See https://github.com/bcgov/actions/tree/main/image-tracker");
   const debug = process.env.INPUT_DEBUG === 'true';
   const token = process.env.INPUT_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
   const eventName = process.env.TEST_EVENT_NAME || process.env.GITHUB_EVENT_NAME;
