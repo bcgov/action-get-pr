@@ -17,7 +17,7 @@ jobs:
   # Dump GitHub Context.Event
   dump:
     name: Event details
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Event details
         env:
@@ -30,7 +30,7 @@ jobs:
   # Test for PR, merge queue and merge to main using the local Node.js action
   get-pr:
     name: Get PR number
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       pr: ${{ steps.vars.outputs.pr }}
     steps:
@@ -44,7 +44,7 @@ jobs:
     needs: [get-pr]
     env:
       pr: ${{ needs.get-pr.outputs.pr }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Verify PR number
         run: |
@@ -58,7 +58,7 @@ jobs:
   # We use TEST_* counterparts to override and test specific event flows in CI.
   test-scenarios:
     name: Test Scenarios
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -148,7 +148,7 @@ jobs:
     if: |
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       actions: write
       contents: read
