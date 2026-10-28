@@ -65,7 +65,7 @@ jobs:
       - name: Set up Node.js 24
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
 
       # Scenario 1: Mock a standard pull request event
       # We generate a minimal JSON event payload on disk to test native payload parsing.
